@@ -1,0 +1,222 @@
+//Pract2
+//Lara González Abad y Raúl Cid González
+
+const users: { nombre: string; edad: number; id: number }[] = [
+  { nombre: "Lara", edad: 20, id: 1 },
+  { nombre: "Raúl", edad: 20, id: 2 }
+];
+const cocktails: {
+  nombre: string;
+  ingredientes: string[];
+  instrucciones: string[];
+  nombreUsuarioCreador: string;
+  ultimoUsarioEditor: string;
+  ultimaFechaDeEdicion: string;
+  id: number;
+}[] = [];
+
+// Controlador principal
+const handler = async (req: Request): Promise<Response> => {
+  const url = new URL(req.url);
+  const path = url.pathname;
+  const method = req.method;
+
+  // Ejercicio 1: Crear un nuevo usuario
+  if (path === '/crear-usuario' && method === 'POST') {
+    const newUser = await req.json();
+    const { nombre, edad } = newUser;
+
+    if (!nombre || !edad) {
+      return new Response("Nombre y edad son requeridos", { status: 400 });
+    }
+
+    const userExists = users.some(user => user.nombre === nombre);
+    if (userExists) {
+      return new Response("El usuario ya existe", { status: 409 });
+    }
+
+    const id = users.length ? users[users.length - 1].id + 1 : 1;
+    const user = { nombre, edad, id };
+
+    users.push(user);
+
+    return new Response(JSON.stringify(user), {
+      status: 201, // 201: Creación exitosa
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 2: Obtener todos los usuarios
+  if (path === '/usuarios' && method === 'GET') {
+    return new Response(JSON.stringify(users), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 3: Filtrar usuarios por edad y/o nombre
+  if (path === '/filtrar-usuarios' && method === 'GET') {
+    const edadParam = url.searchParams.get('edad');
+    const nombreParam = url.searchParams.get('nombre');
+    const edad = edadParam ? parseInt(edadParam) : undefined;
+
+    const filteredUsers = users.filter(user => {
+      const ageCondition = edad !== undefined ? user.edad >= edad : true;
+      const nameCondition = nombreParam ? user.nombre.includes(nombreParam) : true;
+      return ageCondition && nameCondition;
+    });
+
+    return new Response(JSON.stringify(filteredUsers), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 4: Editar un usuario
+  if (path === '/editar-usuario' && method === 'PATCH') {
+    const idParam = url.searchParams.get('id');
+    const id = idParam ? parseInt(idParam) : undefined;
+
+    if (id === undefined) {
+      return new Response("ID es requerido", { status: 400 });
+    }
+
+    const userIndex = users.findIndex(user => user.id === id);
+    if (userIndex === -1) {
+      return new Response("Usuario no encontrado", { status: 404 });
+    }
+
+    const newData = await req.json(); 
+    const updatedUser = { ...users[userIndex], ...newData };
+    users[userIndex] = updatedUser;
+
+    return new Response(JSON.stringify(updatedUser), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 5: Eliminar un usuario
+  if (path === '/eliminar-usuario' && method === 'DELETE') {
+    const idParam = url.searchParams.get('id');
+    const id = idParam ? parseInt(idParam) : undefined;
+
+    if (id === undefined) {
+      return new Response("ID es requerido", { status: 400 });
+    }
+
+    const userIndex = users.findIndex(user => user.id === id);
+    if (userIndex === -1) {
+      return new Response("Usuario no encontrado", { status: 404 });
+    }
+
+    users.splice(userIndex, 1);
+
+    return new Response(null, { status: 204 });
+  }
+
+  // Ejercicio 6: Guardar cocktail
+  if (path === '/guardar-cocktail' && method === 'POST') {
+    const newCocktail = await req.json();
+    const { nombre, ingredientes, instrucciones, nombreUsuarioCreador, idUsuarioCreador } = newCocktail;
+
+    const creator = users.find(user => user.id === idUsuarioCreador);
+    if (!creator) {
+      return new Response("Usuario no encontrado", { status: 404 });
+    }
+    if (creator.edad < 18) {
+      return new Response("Solo usuarios mayores de edad pueden crear cocktails", { status: 403 });
+    }
+
+    const cocktailExists = cocktails.some(cocktail => cocktail.nombre === nombre);
+    if (cocktailExists) {
+      return new Response("El cocktail ya existe", { status: 409 });
+    }
+
+    const id = cocktails.length ? cocktails[cocktails.length - 1].id + 1 : 1;
+    const cocktail = {
+      nombre,
+      ingredientes,
+      instrucciones,
+      nombreUsuarioCreador,
+      ultimoUsarioEditor: nombreUsuarioCreador,
+      ultimaFechaDeEdicion: new Date().toISOString(),
+      id,
+    };
+
+    cocktails.push(cocktail);
+
+    return new Response(JSON.stringify(cocktail), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 7: Editar cocktail
+  if (path === '/editar-cocktail' && method === 'PATCH') {
+    const idParam = url.searchParams.get('id');
+    const id = idParam ? parseInt(idParam) : undefined;
+
+    if (id === undefined) {
+      return new Response("ID es requerido", { status: 400 });
+    }
+
+    const cocktailIndex = cocktails.findIndex(cocktail => cocktail.id === id);
+    if (cocktailIndex === -1) {
+      return new Response("Cocktail no encontrado", { status: 404 });
+    }
+
+    const newData = await req.json();
+    const updatedCocktail = {
+      ...cocktails[cocktailIndex],
+      ...newData,
+      ultimoUsarioEditor: newData.nombreUsuarioEditor || cocktails[cocktailIndex].ultimoUsarioEditor,
+      ultimaFechaDeEdicion: new Date().toISOString(),
+    };
+
+    cocktails[cocktailIndex] = updatedCocktail;
+
+    return new Response(JSON.stringify(updatedCocktail), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ejercicio 8: Eliminar cocktail (solo el creador puede eliminarlo)
+  if (path === '/eliminar-cocktail' && method === 'DELETE') {
+    const idParam = url.searchParams.get('id');
+    const idUsuario = url.searchParams.get('idUsuario');
+    const id = idParam ? parseInt(idParam) : undefined;
+    const userId = idUsuario ? parseInt(idUsuario) : undefined;
+
+    if (id === undefined || userId === undefined) {
+      return new Response("ID del cocktail y del usuario son requeridos", { status: 400 });
+    }
+
+    const cocktailIndex = cocktails.findIndex(cocktail => cocktail.id === id);
+    if (cocktailIndex === -1) {
+      return new Response("Cocktail no encontrado", { status: 404 });
+    }
+
+    if (cocktails[cocktailIndex].nombreUsuarioCreador !== users.find(user => user.id === userId)?.nombre) {
+      return new Response("Solo el creador puede eliminar el cocktail", { status: 403 });
+    }
+
+    cocktails.splice(cocktailIndex, 1);
+
+    return new Response(null, { status: 204 });
+  }
+
+  // Ejercicio 9: Mostrar todos los cocktails
+  if (path === '/cocktails' && method === 'GET') {
+    return new Response(JSON.stringify(cocktails), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  return new Response("Bienvenido a la API", { status: 200 });
+};
+
+// Inicializar el servidor en el puerto 3000
+Deno.serve({ hostname: "0.0.0.0", port: 3000 }, handler);
